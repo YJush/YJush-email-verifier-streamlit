@@ -1,54 +1,12 @@
 import streamlit as st
 import pandas as pd
-import re
-import dns.resolver
-import smtplib
-
-
-# Function to validate email syntax
-def is_valid_email(email):
-    pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
-    return re.match(pattern, email)
-
-
-# Function to check MX records
-def check_mx_record(email):
-    try:
-        domain = email.split('@')[-1]
-        mx_records = dns.resolver.resolve(domain, 'MX')
-        return bool(mx_records)
-    except:
-        return False
-
-
-# Function to check SMTP authentication
-def check_smtp(email):
-    try:
-        domain = email.split('@')[-1]
-        mx_records = dns.resolver.resolve(domain, 'MX')
-        mx_record = str(mx_records[0].exchange)
-
-        server = smtplib.SMTP(mx_record, 25, timeout=5)
-        server.helo()
-        server.mail('you@example.com')
-        code, _ = server.rcpt(email)
-        server.quit()
-        return code == 250
-    except:
-        return False
-
 
 # Streamlit UI
-st.title("Email List Checker and Verifier")
+st.title("Email List Checker - Duplicate Removal")
 
 st.write("✅ Upload two CSV files with email lists.")
 st.write("✅ Checks for duplicate emails between the two lists.")
-st.write("✅ Performs email verification, including:")
-st.write("- Syntax check (ensures valid email format)")
-st.write("- MX record check (confirms the domain can receive emails)")
-st.write("- SMTP authentication (checks if the email actually exists)")
-st.write("✅ Displays valid emails after filtering out duplicates and invalid ones.")
-st.write("✅ Allows downloading of verified emails.")
+st.write("✅ Displays and allows downloading of unique emails.")
 
 # File upload
 file1 = st.file_uploader("Upload first CSV file", type=["csv"])
@@ -73,39 +31,12 @@ if file1 and file2:
         unique_emails = emails1.union(emails2) - duplicates
 
         st.write(f"🔍 Found {len(duplicates)} duplicate emails.")
-        st.write(f"📌 Total unique emails to verify: {len(unique_emails)}")
+        st.write(f"📌 Total unique emails: {len(unique_emails)}")
 
-        valid_emails = []
-        invalid_emails = []
+        # Display the unique emails in a dataframe
+        df_unique = pd.DataFrame({"Unique Emails": list(unique_emails)})
+        st.dataframe(df_unique)
 
-        for email in unique_emails:
-            syntax_valid = is_valid_email(email)
-            mx_valid = check_mx_record(email) if syntax_valid else False
-            smtp_valid = check_smtp(email) if mx_valid else False
-
-            if syntax_valid and mx_valid and smtp_valid:
-                valid_emails.append(email)
-            else:
-                invalid_emails.append({
-                    "Email": email,
-                    "Syntax": syntax_valid,
-                    "MX Record": mx_valid,
-                    "SMTP": smtp_valid
-                })
-
-        # Display results
-        st.write(f"✅ Valid emails ready to send: {len(valid_emails)}")
-        st.write(f"❌ Invalid emails found: {len(invalid_emails)}")
-
-        if invalid_emails:
-            st.write("### ❌ Invalid Email Breakdown")
-            df_invalid = pd.DataFrame(invalid_emails)
-            st.dataframe(df_invalid)
-
-        if valid_emails:
-            df_valid = pd.DataFrame({"Valid Emails": valid_emails})
-            st.dataframe(df_valid)
-
-            # Allow download of valid emails
-            csv = df_valid.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Verified Emails", data=csv, file_name="verified_emails.csv", mime="text/csv")
+        # Allow download of the unique emails
+        csv = df_unique.to_csv(index=False).encode('utf-8')
+        st.download_button("Download Unique Emails", data=csv, file_name="unique_emails.csv", mime="text/csv")
